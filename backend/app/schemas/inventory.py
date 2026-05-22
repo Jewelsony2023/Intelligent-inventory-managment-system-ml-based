@@ -152,7 +152,7 @@ class StockMovementCreate(StockMovementBase):
 
 class StockMovementOut(StockMovementBase):
     id: UUID
-    created_by: Optional[UUID] = None
+    created_by: Optional[str] = None
     created_at: datetime
     product: Optional[ProductOut] = None
 

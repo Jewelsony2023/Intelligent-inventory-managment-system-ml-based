@@ -98,7 +98,7 @@ class StockMovement(Base):
     unit_cost = Column(Float, nullable=True)
     reference_no = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     product = relationship("Product", back_populates="stock_movements")

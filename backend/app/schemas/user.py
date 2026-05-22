@@ -82,3 +82,7 @@ class UserListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+# Aliases for compatibility
+Token = TokenResponse
+UserOut = UserResponse

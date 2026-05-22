@@ -75,6 +75,36 @@ Full permission matrix in `backend/app/core/rbac.py`.
 
 ---
 
+## Day 2 - Inventory Module
+
+### What was built
+
+- Added SQLAlchemy inventory models: Category, Supplier, Product, InventoryItem, and StockMovement.
+- Added Pydantic schemas for all inventory models, including paginated response types.
+- Added inventory API endpoints for CRUD operations with RBAC, pagination, search, and filtering.
+- Added Alembic migration support and the inventory models migration.
+- Added RBAC permission dependency support for protected inventory routes.
+- Added seed data for 12 products, 4 suppliers, 5 categories, and 10 stock movements.
+- Fixed the users table foreign key type mismatch between VARCHAR and UUID.
+
+### Run the migration
+
+```bash
+docker-compose exec backend sh -c "cd /app && alembic upgrade head"
+```
+
+### Seed inventory data
+
+```bash
+docker-compose exec backend sh -c "cd /app && python seed_inventory.py"
+```
+
+### API documentation
+
+Available at: http://localhost:8000/api/v1/docs
+
+---
+
 ## Project structure
 
 ```

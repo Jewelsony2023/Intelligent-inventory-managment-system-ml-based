@@ -106,3 +106,43 @@ def get_permissions(role: Role) -> Set[Permission]:
 
 def has_permission(role: Role, permission: Permission) -> bool:
     return permission in get_permissions(role)
+
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+
+def require_permission(permission: str):
+    async def dependency(
+        token: str = Depends(oauth2_scheme),
+    ):
+        from app.core.security import decode_token
+        from app.core.config import settings
+
+        payload = decode_token(token)
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+            )
+
+        role_str = payload.get("role")
+        user_id = payload.get("sub")
+
+        try:
+            role = Role(role_str)
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Invalid role")
+
+        perm = Permission(permission) if permission in Permission._value2member_map_ else None
+        if perm is None or not has_permission(role, perm):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: {permission} required",
+            )
+
+        return {"id": user_id, "role": role}
+
+    return dependency

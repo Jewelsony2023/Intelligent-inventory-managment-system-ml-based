@@ -49,3 +49,6 @@ def decode_token(token: str, expected_type: str = "access") -> dict:
         return payload
     except JWTError:
         raise CREDENTIALS_EXCEPTION
+    
+# Aliases for compatibility
+get_password_hash = hash_password
