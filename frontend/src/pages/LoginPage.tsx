@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
+import type { LoginPayload } from "../types";
 
 const schema = z.object({
   email: z.string().email("Invalid email"),

@@ -1,8 +1,39 @@
+export type Permission =
+  | 'inventory:read'
+  | 'inventory:write'
+  | 'inventory:delete'
+  | 'product:read'
+  | 'product:write'
+  | 'product:delete'
+  | 'order:read'
+  | 'order:write'
+  | 'order:approve'
+  | 'supplier:read'
+  | 'supplier:write'
+  | 'analytics:read'
+  | 'forecast:read'
+  | 'forecast:configure'
+  | 'alert:read'
+  | 'alert:manage'
+  | 'user:read'
+  | 'user:write'
+  | 'user:delete'
+  | 'role:manage'
+  | 'audit:read'
+  | 'settings:read'
+  | 'settings:write';
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
 export interface User {
   id: string;
   email: string;
   full_name: string;
   role: 'admin' | 'manager' | 'warehouse_staff' | 'viewer';
+  permissions: Permission[];
   is_active: boolean;
   is_verified: boolean;
   created_at: string;
