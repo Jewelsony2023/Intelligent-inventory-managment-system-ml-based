@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
 import type {
   Category, Supplier, Product, InventoryItem,
-  StockMovement, PaginatedProducts, PaginatedInventory
+  StockMovement, PaginatedProducts, PaginatedInventory,
+  ForecastResponse, AnomalyLog, ReorderRecommendation, MLPipelineResult
 } from '../types';
 
 // ── Categories ──────────────────────────────────────────────
@@ -108,3 +109,68 @@ export const useCreateMovement = () => {
     },
   });
 };
+// ── Paste this block at the BOTTOM of frontend/src/lib/queries.ts ─────────────
+// Assumes the file already imports: useQuery, useMutation, useQueryClient from @tanstack/react-query
+// and `api` from './api'
+// Also add these types to the import from '../types':
+//   ForecastResponse, AnomalyLog, ReorderRecommendation, MLPipelineResult
+
+export function useReorderRecommendations() {
+  return useQuery<ReorderRecommendation[]>({
+    queryKey: ["ml", "reorder-recommendations"],
+    queryFn: async () => {
+      const { data } = await api.get("/ml/reorder-recommendations");
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useForecast(productId: string | null) {
+  return useQuery<ForecastResponse>({
+    queryKey: ["ml", "forecast", productId],
+    queryFn: async () => {
+      const { data } = await api.get(`/ml/forecast/${productId}?horizon=30`);
+      return data;
+    },
+    enabled: !!productId,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useForecastExplain(productId: string | null) {
+  return useQuery({
+    queryKey: ["ml", "forecast", productId, "explain"],
+    queryFn: async () => {
+      const { data } = await api.get(`/ml/forecast/${productId}/explain`);
+      return data;
+    },
+    enabled: !!productId,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useAnomalies(productId?: string) {
+  return useQuery<AnomalyLog[]>({
+    queryKey: ["ml", "anomalies", productId ?? "all"],
+    queryFn: async () => {
+      const params = productId ? `?product_id=${productId}` : "";
+      const { data } = await api.get(`/ml/anomalies${params}`);
+      return data;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useRunPipeline() {
+  const queryClient = useQueryClient();
+  return useMutation<MLPipelineResult, Error, void>({
+    mutationFn: async () => {
+      const { data } = await api.post("/ml/run-pipeline");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ml"] });
+    },
+  });
+}

@@ -2,11 +2,12 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 
 const navItems = [
-  { to: '/dashboard', icon: '⬛', label: 'Dashboard' },
-  { to: '/products',  icon: '📦', label: 'Products' },
-  { to: '/inventory', icon: '🗄️', label: 'Inventory' },
-  { to: '/movements', icon: '↕️', label: 'Movements' },
-  { to: '/suppliers', icon: '🏭', label: 'Suppliers' },
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/products',  label: 'Products' },
+  { to: '/inventory', label: 'Inventory' },
+  { to: '/movements', label: 'Movements' },
+  { to: '/suppliers', label: 'Suppliers' },
+  { to: '/ml-insights', label: 'ML Insights' },
 ];
 
 export default function Layout() {

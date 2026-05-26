@@ -8,6 +8,9 @@ import InventoryPage from './pages/InventoryPage';
 import ProductsPage from './pages/ProductsPage';
 import MovementsPage from './pages/MovementsPage';
 import SuppliersPage from './pages/SuppliersPage';
+import MLInsightsPage from "./pages/MLInsightsPage"; 
+<Route path="/ml-insights" element={<ProtectedRoute><MLInsightsPage /></ProtectedRoute>} />  // add route
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
