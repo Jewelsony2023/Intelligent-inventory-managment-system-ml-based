@@ -18,7 +18,7 @@ import asyncio
 import os
 import random
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import numpy as np
 from sqlalchemy import text
@@ -142,7 +142,7 @@ async def seed(db: AsyncSession) -> None:
     ).fetchall()
     products = {row.sku: str(row.id) for row in product_rows}
 
-    today = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+    today = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
     inserted = 0
 
     for sku, gen_fn in SKU_PATTERNS.items():
