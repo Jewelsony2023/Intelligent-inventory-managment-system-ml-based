@@ -8,9 +8,7 @@ import InventoryPage from './pages/InventoryPage';
 import ProductsPage from './pages/ProductsPage';
 import MovementsPage from './pages/MovementsPage';
 import SuppliersPage from './pages/SuppliersPage';
-import MLInsightsPage from "./pages/MLInsightsPage"; 
-<Route path="/ml-insights" element={<ProtectedRoute><MLInsightsPage /></ProtectedRoute>} />  // add route
-
+import MLInsightsPage from './pages/MLInsightsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +29,7 @@ export default function App() {
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/movements" element={<MovementsPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
+              <Route path="/ml-insights" element={<MLInsightsPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
