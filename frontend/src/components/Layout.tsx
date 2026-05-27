@@ -104,9 +104,7 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-slate-900 overflow-hidden">
-      {/* Sidebar */}
       <aside className="w-60 flex-shrink-0 bg-slate-800 border-r border-white/10 flex flex-col">
-        {/* Logo */}
         <div className="px-5 py-5 border-b border-white/10">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
@@ -123,7 +121,6 @@ export default function Layout() {
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {visibleNav.map((item) => (
             <NavLink
@@ -143,16 +140,10 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* User footer */}
         <div className="px-3 py-4 border-t border-white/10">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
             <div className="w-7 h-7 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 text-xs font-bold flex-shrink-0">
-              {user?.full_name
-                ?.split(" ")
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")
-                .toUpperCase() ?? "?"}
+              {user?.full_name?.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase() ?? "?"}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-xs font-medium truncate">{user?.full_name}</p>
@@ -173,7 +164,6 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>

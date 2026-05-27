@@ -8,8 +8,6 @@ import {
 import { useAuthStore } from "../stores/authStore";
 import type { User, UserCreate, UserUpdate } from "../types";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const ROLE_STYLES: Record<string, string> = {
   admin: "bg-purple-500/20 text-purple-300 border border-purple-500/30",
   manager: "bg-blue-500/20 text-blue-300 border border-blue-500/30",
@@ -37,15 +35,13 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 function formatDate(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 }
-
-// ─── Create / Edit Modal ─────────────────────────────────────────────────────
 
 interface UserModalProps {
   mode: "create" | "edit";
@@ -80,7 +76,6 @@ function UserModal({ mode, user, onClose }: UserModalProps) {
       setError("Password is required.");
       return;
     }
-
     try {
       if (mode === "create") {
         const payload: UserCreate = {
@@ -115,11 +110,8 @@ function UserModal({ mode, user, onClose }: UserModalProps) {
         </h2>
 
         <div className="space-y-4">
-          {/* Full Name */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">
-              Full Name
-            </label>
+            <label className="block text-sm text-slate-400 mb-1">Full Name</label>
             <input
               type="text"
               value={form.full_name}
@@ -129,7 +121,6 @@ function UserModal({ mode, user, onClose }: UserModalProps) {
             />
           </div>
 
-          {/* Email — read-only in edit mode */}
           <div>
             <label className="block text-sm text-slate-400 mb-1">Email</label>
             {mode === "create" ? (
@@ -147,34 +138,25 @@ function UserModal({ mode, user, onClose }: UserModalProps) {
             )}
           </div>
 
-          {/* Password — create only */}
           {mode === "create" && (
             <div>
-              <label className="block text-sm text-slate-400 mb-1">
-                Password
-              </label>
+              <label className="block text-sm text-slate-400 mb-1">Password</label>
               <input
                 type="password"
                 value={form.password}
-                onChange={(e) =>
-                  setForm({ ...form, password: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
                 className="w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Min 8 characters"
               />
             </div>
           )}
 
-          {/* Role */}
           <div>
             <label className="block text-sm text-slate-400 mb-1">Role</label>
             <select
               value={form.role}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  role: e.target.value as UserCreate["role"],
-                })
+                setForm({ ...form, role: e.target.value as UserCreate["role"] })
               }
               className="w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
@@ -186,15 +168,12 @@ function UserModal({ mode, user, onClose }: UserModalProps) {
             </select>
           </div>
 
-          {/* Active toggle — edit only */}
           {mode === "edit" && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-400">Account Active</span>
               <button
                 type="button"
-                onClick={() =>
-                  setForm({ ...form, is_active: !form.is_active })
-                }
+                onClick={() => setForm({ ...form, is_active: !form.is_active })}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   form.is_active ? "bg-indigo-600" : "bg-slate-600"
                 }`}
@@ -228,7 +207,7 @@ function UserModal({ mode, user, onClose }: UserModalProps) {
             className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading
-              ? "Saving…"
+              ? "Saving..."
               : mode === "create"
               ? "Create User"
               : "Save Changes"}
@@ -239,15 +218,7 @@ function UserModal({ mode, user, onClose }: UserModalProps) {
   );
 }
 
-// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
-
-function DeleteConfirm({
-  user,
-  onClose,
-}: {
-  user: User;
-  onClose: () => void;
-}) {
+function DeleteConfirm({ user, onClose }: { user: User; onClose: () => void }) {
   const deleteUser = useDeleteUser();
   const [error, setError] = useState("");
 
@@ -266,16 +237,8 @@ function DeleteConfirm({
       <div className="bg-slate-800 border border-white/10 rounded-xl w-full max-w-sm p-6 shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
           <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-red-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
+            <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
               />
             </svg>
@@ -307,15 +270,13 @@ function DeleteConfirm({
             disabled={deleteUser.isPending}
             className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
           >
-            {deleteUser.isPending ? "Deleting…" : "Delete"}
+            {deleteUser.isPending ? "Deleting..." : "Delete"}
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
   const { user: currentUser } = useAuthStore();
@@ -329,13 +290,11 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">User Management</h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            {users?.length ?? 0} user{users?.length !== 1 ? "s" : ""} in the
-            system
+            {users?.length ?? 0} user{users?.length !== 1 ? "s" : ""} in the system
           </p>
         </div>
         {isAdmin && (
@@ -343,127 +302,65 @@ export default function UsersPage() {
             onClick={() => setShowCreate(true)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             New User
           </button>
         )}
       </div>
 
-      {/* Table */}
       <div className="bg-slate-800 border border-white/10 rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-slate-400">
-            <svg
-              className="animate-spin w-6 h-6 mr-2"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v8z"
-              />
+            <svg className="animate-spin w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
-            Loading users…
+            Loading users...
           </div>
         ) : error ? (
-          <div className="text-center py-16 text-red-400">
-            Failed to load users.
-          </div>
+          <div className="text-center py-16 text-red-400">Failed to load users.</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/10">
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">
-                  Name
-                </th>
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">
-                  Email
-                </th>
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">
-                  Role
-                </th>
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">
-                  Status
-                </th>
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">
-                  Created
-                </th>
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">
-                  Last Login
-                </th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium">Name</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium">Email</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium">Role</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium">Status</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium">Created</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium">Last Login</th>
                 {isAdmin && (
-                  <th className="px-5 py-3 text-slate-400 font-medium text-right">
-                    Actions
-                  </th>
+                  <th className="px-5 py-3 text-slate-400 font-medium text-right">Actions</th>
                 )}
               </tr>
             </thead>
             <tbody>
               {users?.map((u) => (
-                <tr
-                  key={u.id}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                >
+                <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 text-xs font-bold flex-shrink-0">
-                        {u.full_name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .slice(0, 2)
-                          .join("")
-                          .toUpperCase()}
+                        {u.full_name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
                       </div>
-                      <span className="text-white font-medium">
-                        {u.full_name}
-                      </span>
+                      <span className="text-white font-medium">{u.full_name}</span>
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-slate-300">{u.email}</td>
+                  <td className="px-5 py-3.5"><RoleBadge role={u.role} /></td>
                   <td className="px-5 py-3.5">
-                    <RoleBadge role={u.role} />
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                        u.is_active ? "text-emerald-400" : "text-slate-500"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          u.is_active ? "bg-emerald-400" : "bg-slate-500"
-                        }`}
-                      />
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                      u.is_active ? "text-emerald-400" : "text-slate-500"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        u.is_active ? "bg-emerald-400" : "bg-slate-500"
+                      }`} />
                       {u.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-slate-400">
-                    {formatDate(u.created_at)}
-                  </td>
-                  <td className="px-5 py-3.5 text-slate-400">
-                    {formatDate(u.last_login)}
-                  </td>
+                  <td className="px-5 py-3.5 text-slate-400">{formatDate(u.created_at)}</td>
+                  <td className="px-5 py-3.5 text-slate-400">{formatDate(u.last_login)}</td>
                   {isAdmin && (
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2 justify-end">
@@ -472,37 +369,20 @@ export default function UsersPage() {
                           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
                           title="Edit user"
                         >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                             />
                           </svg>
                         </button>
-                        {/* Prevent deleting yourself */}
                         {u.id !== currentUser?.id && (
                           <button
                             onClick={() => setDeletingUser(u)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                             title="Delete user"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                               />
                             </svg>
@@ -515,10 +395,7 @@ export default function UsersPage() {
               ))}
               {users?.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={isAdmin ? 7 : 6}
-                    className="px-5 py-12 text-center text-slate-500"
-                  >
+                  <td colSpan={isAdmin ? 7 : 6} className="px-5 py-12 text-center text-slate-500">
                     No users found.
                   </td>
                 </tr>
@@ -528,23 +405,9 @@ export default function UsersPage() {
         )}
       </div>
 
-      {/* Modals */}
-      {showCreate && (
-        <UserModal mode="create" onClose={() => setShowCreate(false)} />
-      )}
-      {editingUser && (
-        <UserModal
-          mode="edit"
-          user={editingUser}
-          onClose={() => setEditingUser(null)}
-        />
-      )}
-      {deletingUser && (
-        <DeleteConfirm
-          user={deletingUser}
-          onClose={() => setDeletingUser(null)}
-        />
-      )}
+      {showCreate && <UserModal mode="create" onClose={() => setShowCreate(false)} />}
+      {editingUser && <UserModal mode="edit" user={editingUser} onClose={() => setEditingUser(null)} />}
+      {deletingUser && <DeleteConfirm user={deletingUser} onClose={() => setDeletingUser(null)} />}
     </div>
   );
 }

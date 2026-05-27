@@ -1,7 +1,10 @@
 import { useMemo } from "react";
-import { useProducts, useCategories, useMovements, useReorderRecommendations } from "../lib/queries";
-
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
+import {
+  useProducts,
+  useCategories,
+  useMovements,
+  useReorderRecommendations,
+} from "../lib/queries";
 
 interface KPICardProps {
   label: string;
@@ -35,8 +38,6 @@ function KPICard({ label, value, icon, iconBg, sub, loading }: KPICardProps) {
   );
 }
 
-// ─── Low Stock Row ────────────────────────────────────────────────────────────
-
 function LowStockRow({ label, urgency }: { label: string; urgency: string }) {
   const colors: Record<string, string> = {
     critical: "text-red-400 bg-red-500/10 border-red-500/20",
@@ -47,14 +48,14 @@ function LowStockRow({ label, urgency }: { label: string; urgency: string }) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
       <span className="text-slate-300 text-sm">{label}</span>
-      <span className={`text-xs font-medium px-2 py-0.5 rounded border ${colors[urgency] ?? "text-slate-400 bg-slate-700 border-slate-600"}`}>
+      <span className={`text-xs font-medium px-2 py-0.5 rounded border ${
+        colors[urgency] ?? "text-slate-400 bg-slate-700 border-slate-600"
+      }`}>
         {urgency.charAt(0).toUpperCase() + urgency.slice(1)}
       </span>
     </div>
   );
 }
-
-// ─── Recent Movements ─────────────────────────────────────────────────────────
 
 const MOVE_COLORS: Record<string, string> = {
   IN: "text-emerald-400 bg-emerald-500/10",
@@ -63,21 +64,17 @@ const MOVE_COLORS: Record<string, string> = {
   ADJUSTMENT: "text-amber-400 bg-amber-500/10",
 };
 
-// ─── Dashboard Page ───────────────────────────────────────────────────────────
-
 export default function DashboardPage() {
   const { data: productsData, isLoading: loadingProducts } = useProducts({ page: 1, size: 1 });
   const { data: categories, isLoading: loadingCategories } = useCategories();
   const { data: movements, isLoading: loadingMovements } = useMovements({ limit: 200 });
   const { data: reorderRecs, isLoading: loadingReorder } = useReorderRecommendations();
 
-  // Low stock = recommendations with urgency !== 'ok'
   const lowStockItems = useMemo(
     () => reorderRecs?.filter((r) => r.urgency_label !== "ok") ?? [],
     [reorderRecs]
   );
 
-  // Today's movements — filter client-side by today's date
   const todayMovements = useMemo(() => {
     if (!movements) return [];
     const today = new Date().toDateString();
@@ -90,15 +87,11 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Page title */}
       <div>
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="text-slate-400 text-sm mt-0.5">
-          Live overview of your inventory system
-        </p>
+        <p className="text-slate-400 text-sm mt-0.5">Live overview of your inventory system</p>
       </div>
 
-      {/* KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <KPICard
           label="Total Products"
@@ -165,9 +158,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Bottom row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Low Stock Items */}
         <div className="bg-slate-800 border border-white/10 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-white font-semibold">Low Stock Alerts</h2>
@@ -183,7 +174,7 @@ export default function DashboardPage() {
             </div>
           ) : lowStockItems.length === 0 ? (
             <div className="py-8 text-center text-slate-500 text-sm">
-              ✓ All stock levels are healthy
+              All stock levels are healthy
             </div>
           ) : (
             <div>
@@ -203,7 +194,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Recent Movements */}
         <div className="bg-slate-800 border border-white/10 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-white font-semibold">Recent Movements</h2>
@@ -222,16 +212,11 @@ export default function DashboardPage() {
           ) : (
             <div>
               {recentMovements.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
-                >
+                <div key={m.id} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${
-                        MOVE_COLORS[m.movement_type] ?? "text-slate-400 bg-slate-700"
-                      }`}
-                    >
+                    <span className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${
+                      MOVE_COLORS[m.movement_type] ?? "text-slate-400 bg-slate-700"
+                    }`}>
                       {m.movement_type}
                     </span>
                     <span className="text-slate-300 text-sm truncate">
@@ -239,9 +224,7 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-white text-sm font-medium">
-                      ×{m.quantity}
-                    </span>
+                    <span className="text-white text-sm font-medium">x{m.quantity}</span>
                     <span className="text-slate-500 text-xs">
                       {new Date(m.created_at).toLocaleDateString("en-US", {
                         month: "short",

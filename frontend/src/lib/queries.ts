@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import api from "./api";
+import { api } from "./api";
 import type {
   PaginatedResponse,
   User,
@@ -25,7 +25,7 @@ import type {
   MLPipelineResult,
 } from "../types";
 
-// ─── Query Keys ───────────────────────────────────────────────────────────────
+// === Query Keys ==============================================================
 
 export const QUERY_KEYS = {
   users: ["users"] as const,
@@ -46,7 +46,7 @@ export const QUERY_KEYS = {
   reorderRecommendations: ["reorderRecommendations"] as const,
 };
 
-// ─── Users ───────────────────────────────────────────────────────────────────
+// === Users ===================================================================
 
 export function useUsers() {
   return useQuery({
@@ -102,7 +102,7 @@ export function useDeleteUser() {
   });
 }
 
-// ─── Categories ───────────────────────────────────────────────────────────────
+// === Categories ==============================================================
 
 export function useCategories() {
   return useQuery({
@@ -118,10 +118,7 @@ export function useCreateCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: CategoryCreate) => {
-      const { data } = await api.post<Category>(
-        "/inventory/categories",
-        payload
-      );
+      const { data } = await api.post<Category>("/inventory/categories", payload);
       return data;
     },
     onSuccess: () => {
@@ -133,13 +130,7 @@ export function useCreateCategory() {
 export function useUpdateCategory() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      payload,
-    }: {
-      id: string;
-      payload: CategoryUpdate;
-    }) => {
+    mutationFn: async ({ id, payload }: { id: string; payload: CategoryUpdate }) => {
       const { data } = await api.patch<Category>(
         `/inventory/categories/${id}`,
         payload
@@ -164,7 +155,7 @@ export function useDeleteCategory() {
   });
 }
 
-// ─── Suppliers ────────────────────────────────────────────────────────────────
+// === Suppliers ===============================================================
 
 export function useSuppliers() {
   return useQuery({
@@ -192,13 +183,7 @@ export function useCreateSupplier() {
 export function useUpdateSupplier() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      payload,
-    }: {
-      id: string;
-      payload: SupplierUpdate;
-    }) => {
+    mutationFn: async ({ id, payload }: { id: string; payload: SupplierUpdate }) => {
       const { data } = await api.patch<Supplier>(
         `/inventory/suppliers/${id}`,
         payload
@@ -223,7 +208,7 @@ export function useDeleteSupplier() {
   });
 }
 
-// ─── Products ─────────────────────────────────────────────────────────────────
+// === Products ================================================================
 
 export function useProducts(params?: {
   page?: number;
@@ -271,13 +256,7 @@ export function useCreateProduct() {
 export function useUpdateProduct() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      payload,
-    }: {
-      id: string;
-      payload: ProductUpdate;
-    }) => {
+    mutationFn: async ({ id, payload }: { id: string; payload: ProductUpdate }) => {
       const { data } = await api.patch<Product>(
         `/inventory/products/${id}`,
         payload
@@ -302,7 +281,7 @@ export function useDeleteProduct() {
   });
 }
 
-// ─── Inventory ────────────────────────────────────────────────────────────────
+// === Inventory ===============================================================
 
 export function useInventory(params?: {
   page?: number;
@@ -341,13 +320,7 @@ export function useCreateInventoryItem() {
 export function useUpdateInventoryItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      payload,
-    }: {
-      id: string;
-      payload: InventoryItemUpdate;
-    }) => {
+    mutationFn: async ({ id, payload }: { id: string; payload: InventoryItemUpdate }) => {
       const { data } = await api.patch<InventoryItem>(
         `/inventory/inventory/${id}`,
         payload
@@ -360,12 +333,9 @@ export function useUpdateInventoryItem() {
   });
 }
 
-// ─── Movements ────────────────────────────────────────────────────────────────
+// === Movements ===============================================================
 
-export function useMovements(params?: {
-  product_id?: string;
-  limit?: number;
-}) {
+export function useMovements(params?: { product_id?: string; limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.movements(params),
     queryFn: async () => {
@@ -395,7 +365,7 @@ export function useCreateMovement() {
   });
 }
 
-// ─── ML ───────────────────────────────────────────────────────────────────────
+// === ML ======================================================================
 
 export function useForecast(productId: string, horizon?: number) {
   return useQuery({
@@ -446,7 +416,8 @@ export function useReorderRecommendations() {
   });
 }
 
-export function useRunMLPipeline() {
+// Named useRunPipeline to match MLInsightsPage import
+export function useRunPipeline() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
@@ -459,3 +430,6 @@ export function useRunMLPipeline() {
     },
   });
 }
+
+// Alias for backwards compatibility
+export const useRunMLPipeline = useRunPipeline;

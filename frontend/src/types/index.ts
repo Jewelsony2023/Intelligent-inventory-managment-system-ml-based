@@ -1,4 +1,11 @@
-// ─── Auth & User ────────────────────────────────────────────────────────────
+// === Auth & User =============================================================
+
+export type Permission =
+  | "inventory:read"
+  | "inventory:write"
+  | "inventory:delete"
+  | "users:read"
+  | "users:write";
 
 export interface User {
   id: string;
@@ -9,7 +16,7 @@ export interface User {
   is_verified: boolean;
   created_at: string;
   last_login: string | null;
-  permissions: string[];
+  permissions: Permission[];
 }
 
 export interface UserCreate {
@@ -25,10 +32,14 @@ export interface UserUpdate {
   is_active?: boolean;
 }
 
-export interface LoginRequest {
+// LoginPayload used by authStore and LoginPage
+export interface LoginPayload {
   email: string;
   password: string;
 }
+
+// Keep LoginRequest as alias so nothing else breaks
+export type LoginRequest = LoginPayload;
 
 export interface AuthTokens {
   access_token: string;
@@ -37,7 +48,7 @@ export interface AuthTokens {
   expires_in: number;
 }
 
-// ─── Pagination ──────────────────────────────────────────────────────────────
+// === Pagination ==============================================================
 
 export interface PaginatedResponse<T> {
   items: T[];
@@ -47,7 +58,7 @@ export interface PaginatedResponse<T> {
   pages: number;
 }
 
-// ─── Categories ──────────────────────────────────────────────────────────────
+// === Categories ==============================================================
 
 export interface Category {
   id: string;
@@ -73,7 +84,7 @@ export interface CategoryUpdate {
   is_active?: boolean;
 }
 
-// ─── Suppliers ───────────────────────────────────────────────────────────────
+// === Suppliers ===============================================================
 
 export interface Supplier {
   id: string;
@@ -106,7 +117,7 @@ export interface SupplierUpdate {
   is_active?: boolean;
 }
 
-// ─── Products ────────────────────────────────────────────────────────────────
+// === Products ================================================================
 
 export interface Product {
   id: string;
@@ -152,7 +163,7 @@ export interface ProductUpdate {
   is_active?: boolean;
 }
 
-// ─── Inventory ───────────────────────────────────────────────────────────────
+// === Inventory ===============================================================
 
 export interface InventoryItem {
   id: string;
@@ -182,7 +193,7 @@ export interface InventoryItemUpdate {
   expiry_date?: string;
 }
 
-// ─── Stock Movements ─────────────────────────────────────────────────────────
+// === Stock Movements =========================================================
 
 export type MovementType = "IN" | "OUT" | "TRANSFER" | "ADJUSTMENT";
 
@@ -208,7 +219,7 @@ export interface StockMovementCreate {
   notes?: string;
 }
 
-// ─── ML Types ────────────────────────────────────────────────────────────────
+// === ML Types ================================================================
 
 export interface ForecastResponse {
   product_id: string;
