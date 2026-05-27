@@ -1,44 +1,53 @@
-export type Permission =
-  | 'inventory:read'
-  | 'inventory:write'
-  | 'inventory:delete'
-  | 'product:read'
-  | 'product:write'
-  | 'product:delete'
-  | 'order:read'
-  | 'order:write'
-  | 'order:approve'
-  | 'supplier:read'
-  | 'supplier:write'
-  | 'analytics:read'
-  | 'forecast:read'
-  | 'forecast:configure'
-  | 'alert:read'
-  | 'alert:manage'
-  | 'user:read'
-  | 'user:write'
-  | 'user:delete'
-  | 'role:manage'
-  | 'audit:read'
-  | 'settings:read'
-  | 'settings:write';
-
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
+// ─── Auth & User ────────────────────────────────────────────────────────────
 
 export interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'manager' | 'warehouse_staff' | 'viewer';
-  permissions: Permission[];
+  role: "admin" | "manager" | "warehouse_staff" | "viewer";
   is_active: boolean;
   is_verified: boolean;
   created_at: string;
   last_login: string | null;
+  permissions: string[];
 }
+
+export interface UserCreate {
+  email: string;
+  full_name: string;
+  password: string;
+  role: "admin" | "manager" | "warehouse_staff" | "viewer";
+}
+
+export interface UserUpdate {
+  full_name?: string;
+  role?: "admin" | "manager" | "warehouse_staff" | "viewer";
+  is_active?: boolean;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+// ─── Pagination ──────────────────────────────────────────────────────────────
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+// ─── Categories ──────────────────────────────────────────────────────────────
 
 export interface Category {
   id: string;
@@ -50,10 +59,26 @@ export interface Category {
   created_at: string;
 }
 
+export interface CategoryCreate {
+  name: string;
+  slug: string;
+  description?: string;
+  parent_id?: string;
+}
+
+export interface CategoryUpdate {
+  name?: string;
+  slug?: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+// ─── Suppliers ───────────────────────────────────────────────────────────────
+
 export interface Supplier {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   address: string | null;
   lead_time_days: number;
@@ -62,14 +87,35 @@ export interface Supplier {
   created_at: string;
 }
 
+export interface SupplierCreate {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  lead_time_days?: number;
+  reliability_score?: number;
+}
+
+export interface SupplierUpdate {
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  lead_time_days?: number;
+  reliability_score?: number;
+  is_active?: boolean;
+}
+
+// ─── Products ────────────────────────────────────────────────────────────────
+
 export interface Product {
   id: string;
   sku: string;
   name: string;
   description: string | null;
   barcode: string | null;
-  category_id: string;
-  supplier_id: string;
+  category_id: string | null;
+  supplier_id: string | null;
   unit_cost: number;
   selling_price: number;
   reorder_point: number;
@@ -81,6 +127,32 @@ export interface Product {
   category?: Category;
   supplier?: Supplier;
 }
+
+export interface ProductCreate {
+  sku: string;
+  name: string;
+  description?: string;
+  barcode?: string;
+  category_id?: string;
+  supplier_id?: string;
+  unit_cost: number;
+  selling_price: number;
+  reorder_point?: number;
+  reorder_qty?: number;
+  unit_of_measure?: string;
+}
+
+export interface ProductUpdate {
+  name?: string;
+  description?: string;
+  unit_cost?: number;
+  selling_price?: number;
+  reorder_point?: number;
+  reorder_qty?: number;
+  is_active?: boolean;
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
 
 export interface InventoryItem {
   id: string;
@@ -94,10 +166,30 @@ export interface InventoryItem {
   product?: Product;
 }
 
+export interface InventoryItemCreate {
+  product_id: string;
+  warehouse: string;
+  quantity: number;
+  reserved_qty?: number;
+  lot_number?: string;
+  expiry_date?: string;
+}
+
+export interface InventoryItemUpdate {
+  quantity?: number;
+  reserved_qty?: number;
+  lot_number?: string;
+  expiry_date?: string;
+}
+
+// ─── Stock Movements ─────────────────────────────────────────────────────────
+
+export type MovementType = "IN" | "OUT" | "TRANSFER" | "ADJUSTMENT";
+
 export interface StockMovement {
   id: string;
   product_id: string;
-  movement_type: 'IN' | 'OUT' | 'TRANSFER' | 'ADJUSTMENT';
+  movement_type: MovementType;
   quantity: number;
   unit_cost: number | null;
   reference_no: string | null;
@@ -107,75 +199,36 @@ export interface StockMovement {
   product?: Product;
 }
 
-export interface PaginatedProducts {
-  items: Product[];
-  total: number;
-  page: number;
-  page_size: number;
-  pages: number;
+export interface StockMovementCreate {
+  product_id: string;
+  movement_type: MovementType;
+  quantity: number;
+  unit_cost?: number;
+  reference_no?: string;
+  notes?: string;
 }
 
-export interface PaginatedInventory {
-  items: InventoryItem[];
-  total: number;
-  page: number;
-  page_size: number;
-  pages: number;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-}
-// ── ML Types ──────────────────────────────────────────────────────────────────
+// ─── ML Types ────────────────────────────────────────────────────────────────
 
 export interface ForecastResponse {
   product_id: string;
-  product_name: string;
-  sku: string;
+  model_used: string;
+  forecast_horizon: number;
+  forecast_data: Record<string, number>;
+  confidence_lower: Record<string, number>;
+  confidence_upper: Record<string, number>;
   generated_at: string;
-  forecast: {
-    model_used: "arima" | "holt_winters" | "croston" | "moving_average";
-    horizon_days: number;
-    values: number[];
-    confidence_lower: number[];
-    confidence_upper: number[];
-    model_selection_reason: string;
-    feature_importance: Record<string, number>;
-  };
-  anomalies: {
-    total_points_analysed: number;
-    anomaly_count: number;
-    anomaly_indices: number[];
-    anomaly_quantities: number[];
-    all_scores: number[];
-  };
-  reorder: {
-    current_stock: number;
-    available_stock: number;
-    reorder_point: number;
-    safety_stock: number;
-    recommended_qty: number;
-    urgency_score: number;
-    urgency_label: "critical" | "high" | "medium" | "low" | "ok";
-    days_of_stock_remaining: number;
-    avg_daily_demand: number;
-    reasoning: string;
-  };
+  expires_at: string;
 }
 
 export interface AnomalyLog {
   id: string;
   product_id: string;
-  product_name: string;
-  product_sku: string;
-  movement_id: string;
+  movement_id: string | null;
   anomaly_score: number;
   is_anomaly: boolean;
   detected_at: string;
-  movement_quantity: number;
-  movement_type: "IN" | "OUT";
+  product?: Product;
 }
 
 export interface ReorderRecommendation {
@@ -183,21 +236,20 @@ export interface ReorderRecommendation {
   product_name: string;
   sku: string;
   current_stock: number;
-  available_stock: number;
   reorder_point: number;
-  safety_stock: number;
   recommended_qty: number;
   urgency_score: number;
   urgency_label: "critical" | "high" | "medium" | "low" | "ok";
-  days_of_stock_remaining: number;
-  avg_daily_demand: number;
-  reasoning: string;
-  forecast_model: string;
+  economic_order_qty: number;
+  safety_stock: number;
+  supplier_lead_time: number;
 }
 
 export interface MLPipelineResult {
-  success: boolean;
   products_processed: number;
-  errors: string[];
+  forecasts_generated: number;
+  anomalies_detected: number;
+  reorder_alerts: number;
   duration_seconds: number;
+  run_at: string;
 }

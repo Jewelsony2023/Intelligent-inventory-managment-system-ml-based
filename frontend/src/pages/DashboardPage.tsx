@@ -1,116 +1,258 @@
-import { useProducts, useInventory, useMovements } from '../lib/queries';
+import { useMemo } from "react";
+import { useProducts, useCategories, useMovements, useReorderRecommendations } from "../lib/queries";
 
-const fmt = (n: number) => n.toLocaleString();
-const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+
+interface KPICardProps {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  iconBg: string;
+  sub?: string;
+  loading?: boolean;
+}
+
+function KPICard({ label, value, icon, iconBg, sub, loading }: KPICardProps) {
+  return (
+    <div className="bg-slate-800 border border-white/10 rounded-xl p-5">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-slate-400 text-sm">{label}</p>
+          {loading ? (
+            <div className="mt-2 h-8 w-20 bg-slate-700 rounded animate-pulse" />
+          ) : (
+            <p className="mt-1 text-3xl font-bold text-white">{value}</p>
+          )}
+          {sub && !loading && (
+            <p className="mt-1 text-xs text-slate-500">{sub}</p>
+          )}
+        </div>
+        <div className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${iconBg}`}>
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Low Stock Row ────────────────────────────────────────────────────────────
+
+function LowStockRow({ label, urgency }: { label: string; urgency: string }) {
+  const colors: Record<string, string> = {
+    critical: "text-red-400 bg-red-500/10 border-red-500/20",
+    high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+    medium: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    low: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+  };
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+      <span className="text-slate-300 text-sm">{label}</span>
+      <span className={`text-xs font-medium px-2 py-0.5 rounded border ${colors[urgency] ?? "text-slate-400 bg-slate-700 border-slate-600"}`}>
+        {urgency.charAt(0).toUpperCase() + urgency.slice(1)}
+      </span>
+    </div>
+  );
+}
+
+// ─── Recent Movements ─────────────────────────────────────────────────────────
+
+const MOVE_COLORS: Record<string, string> = {
+  IN: "text-emerald-400 bg-emerald-500/10",
+  OUT: "text-red-400 bg-red-500/10",
+  TRANSFER: "text-blue-400 bg-blue-500/10",
+  ADJUSTMENT: "text-amber-400 bg-amber-500/10",
+};
+
+// ─── Dashboard Page ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { data: products } = useProducts({ page_size: 100 });
-  const { data: inventory } = useInventory({ page_size: 100 });
-  const { data: movements } = useMovements({ limit: 10 });
+  const { data: productsData, isLoading: loadingProducts } = useProducts({ page: 1, size: 1 });
+  const { data: categories, isLoading: loadingCategories } = useCategories();
+  const { data: movements, isLoading: loadingMovements } = useMovements({ limit: 200 });
+  const { data: reorderRecs, isLoading: loadingReorder } = useReorderRecommendations();
 
-  const totalItems = inventory?.total ?? 0;
-  const totalProducts = products?.total ?? 0;
+  // Low stock = recommendations with urgency !== 'ok'
+  const lowStockItems = useMemo(
+    () => reorderRecs?.filter((r) => r.urgency_label !== "ok") ?? [],
+    [reorderRecs]
+  );
 
-  const stockValue = (inventory?.items ?? []).reduce((sum, item) => {
-    const cost = item.product?.unit_cost ?? 0;
-    return sum + item.quantity * cost;
-  }, 0);
+  // Today's movements — filter client-side by today's date
+  const todayMovements = useMemo(() => {
+    if (!movements) return [];
+    const today = new Date().toDateString();
+    return movements.filter(
+      (m) => new Date(m.created_at).toDateString() === today
+    );
+  }, [movements]);
 
-  const lowStock = (inventory?.items ?? []).filter(item => {
-    const rp = item.product?.reorder_point ?? 0;
-    return item.quantity <= rp;
-  });
-
-  const kpis = [
-    { label: 'Total Products', value: fmt(totalProducts), color: '#818cf8' },
-    { label: 'Total Stock Lines', value: fmt(totalItems), color: '#34d399' },
-    { label: 'Stock Value', value: money(stockValue), color: '#f59e0b' },
-    { label: 'Low Stock Alerts', value: fmt(lowStock.length), color: '#f87171' },
-  ];
-
-  const movementColor = (type: string) => {
-    if (type === 'IN') return '#34d399';
-    if (type === 'OUT') return '#f87171';
-    if (type === 'ADJUSTMENT') return '#f59e0b';
-    return '#818cf8';
-  };
+  const recentMovements = movements?.slice(0, 8) ?? [];
 
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 1200 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 600, color: '#f0f0f0', marginBottom: 8 }}>Dashboard</h1>
-      <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 32 }}>Real-time snapshot of your warehouse operations</p>
-
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 40 }}>
-        {kpis.map(({ label, value, color }) => (
-          <div key={label} style={{
-            background: '#141720', border: '1px solid #1e2130',
-            borderRadius: 12, padding: '20px 24px',
-          }}>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-            <div style={{ fontSize: 26, fontWeight: 700, color }}>{value}</div>
-          </div>
-        ))}
+    <div className="p-6 space-y-6">
+      {/* Page title */}
+      <div>
+        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+        <p className="text-slate-400 text-sm mt-0.5">
+          Live overview of your inventory system
+        </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-        {/* Low Stock Alerts */}
-        <div style={{ background: '#141720', border: '1px solid #1e2130', borderRadius: 12, padding: 24 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: '#f0f0f0', marginBottom: 4 }}>Low Stock Alerts</h2>
-          <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 20 }}>{lowStock.length} items below reorder point</p>
-          {lowStock.length === 0 && (
-            <p style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', padding: '20px 0' }}>All stock levels healthy ✓</p>
+      {/* KPI Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <KPICard
+          label="Total Products"
+          value={productsData?.total ?? 0}
+          loading={loadingProducts}
+          sub="across all categories"
+          iconBg="bg-indigo-500/20"
+          icon={
+            <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+            </svg>
+          }
+        />
+
+        <KPICard
+          label="Low Stock Alerts"
+          value={lowStockItems.length}
+          loading={loadingReorder}
+          sub={
+            lowStockItems.filter((r) => r.urgency_label === "critical").length > 0
+              ? `${lowStockItems.filter((r) => r.urgency_label === "critical").length} critical`
+              : "no critical items"
+          }
+          iconBg="bg-red-500/20"
+          icon={
+            <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          }
+        />
+
+        <KPICard
+          label="Movements Today"
+          value={todayMovements.length}
+          loading={loadingMovements}
+          sub="stock transactions"
+          iconBg="bg-emerald-500/20"
+          icon={
+            <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+              />
+            </svg>
+          }
+        />
+
+        <KPICard
+          label="Categories"
+          value={categories?.length ?? 0}
+          loading={loadingCategories}
+          sub="product classifications"
+          iconBg="bg-amber-500/20"
+          icon={
+            <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
+              />
+            </svg>
+          }
+        />
+      </div>
+
+      {/* Bottom row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Low Stock Items */}
+        <div className="bg-slate-800 border border-white/10 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-white font-semibold">Low Stock Alerts</h2>
+            <span className="text-xs text-slate-500">
+              {lowStockItems.length} item{lowStockItems.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          {loadingReorder ? (
+            <div className="space-y-2.5">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-8 bg-slate-700 rounded animate-pulse" />
+              ))}
+            </div>
+          ) : lowStockItems.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 text-sm">
+              ✓ All stock levels are healthy
+            </div>
+          ) : (
+            <div>
+              {lowStockItems.slice(0, 8).map((item) => (
+                <LowStockRow
+                  key={item.product_id}
+                  label={item.product_name}
+                  urgency={item.urgency_label}
+                />
+              ))}
+              {lowStockItems.length > 8 && (
+                <p className="text-xs text-slate-500 mt-2 text-center">
+                  +{lowStockItems.length - 8} more in ML Insights
+                </p>
+              )}
+            </div>
           )}
-          {lowStock.map(item => {
-            const rp = item.product?.reorder_point ?? 0;
-            const pct = Math.min(100, (item.quantity / Math.max(rp, 1)) * 100);
-            const isCritical = item.quantity === 0 || (rp > 0 && item.quantity / rp < 0.3);
-            return (
-              <div key={item.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #1e2130' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: '#d1d5db' }}>{item.product?.name ?? 'Unknown'}</span>
-                  <span style={{ fontSize: 12, color: isCritical ? '#f87171' : '#f59e0b', fontWeight: 500 }}>
-                    {item.quantity} / {rp} min
-                  </span>
-                </div>
-                <div style={{ height: 4, background: '#1e2130', borderRadius: 4 }}>
-                  <div style={{
-                    height: 4, borderRadius: 4,
-                    width: `${pct}%`,
-                    background: isCritical ? '#f87171' : '#f59e0b',
-                    transition: 'width 0.3s',
-                  }} />
-                </div>
-                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>{item.warehouse}</div>
-              </div>
-            );
-          })}
         </div>
 
         {/* Recent Movements */}
-        <div style={{ background: '#141720', border: '1px solid #1e2130', borderRadius: 12, padding: 24 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: '#f0f0f0', marginBottom: 4 }}>Recent Movements</h2>
-          <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 20 }}>Last 10 stock transactions</p>
-          {(movements ?? []).map(m => (
-            <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{
-                  padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                  background: movementColor(m.movement_type) + '22',
-                  color: movementColor(m.movement_type),
-                }}>
-                  {m.movement_type}
-                </span>
-                <span style={{ fontSize: 13, color: '#d1d5db' }}>{m.product?.name ?? m.product_id.slice(0, 8)}</span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 13, color: '#f0f0f0', fontWeight: 500 }}>
-                  {m.movement_type === 'OUT' ? '-' : '+'}{m.quantity}
-                </div>
-                <div style={{ fontSize: 11, color: '#4b5563' }}>{new Date(m.created_at).toLocaleDateString()}</div>
-              </div>
+        <div className="bg-slate-800 border border-white/10 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-white font-semibold">Recent Movements</h2>
+            <span className="text-xs text-slate-500">Last 8 transactions</span>
+          </div>
+          {loadingMovements ? (
+            <div className="space-y-2.5">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-8 bg-slate-700 rounded animate-pulse" />
+              ))}
             </div>
-          ))}
+          ) : recentMovements.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 text-sm">
+              No movements recorded yet
+            </div>
+          ) : (
+            <div>
+              {recentMovements.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${
+                        MOVE_COLORS[m.movement_type] ?? "text-slate-400 bg-slate-700"
+                      }`}
+                    >
+                      {m.movement_type}
+                    </span>
+                    <span className="text-slate-300 text-sm truncate">
+                      {m.product?.name ?? m.product_id.slice(0, 8)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-white text-sm font-medium">
+                      ×{m.quantity}
+                    </span>
+                    <span className="text-slate-500 text-xs">
+                      {new Date(m.created_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
