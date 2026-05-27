@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
+from sqlalchemy.orm import selectinload
 from app.db.session import get_db
 from app.core.rbac import require_permission
 from app.models.inventory import Category, Supplier, Product, InventoryItem, StockMovement
@@ -168,7 +169,10 @@ async def list_products(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(require_permission("inventory:read")),
 ):
-    query = select(Product).where(Product.is_active == True)
+    query = select(Product).options(
+        selectinload(Product.category),
+        selectinload(Product.supplier),
+    ).where(Product.is_active == True)
 
     if search:
         query = query.where(
@@ -212,8 +216,15 @@ async def create_product(
     product = Product(**payload.model_dump())
     db.add(product)
     await db.commit()
-    await db.refresh(product)
-    return product
+    result = await db.execute(
+        select(Product)
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.supplier),
+        )
+        .where(Product.id == product.id)
+    )
+    return result.scalar_one()
 
 
 @router.get("/products/{product_id}", response_model=ProductOut)
@@ -222,7 +233,14 @@ async def get_product(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(require_permission("inventory:read")),
 ):
-    result = await db.execute(select(Product).where(Product.id == product_id))
+    result = await db.execute(
+        select(Product)
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.supplier),
+        )
+        .where(Product.id == product_id)
+    )
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -236,15 +254,29 @@ async def update_product(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(require_permission("inventory:write")),
 ):
-    result = await db.execute(select(Product).where(Product.id == product_id))
+    result = await db.execute(
+        select(Product)
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.supplier),
+        )
+        .where(Product.id == product_id)
+    )
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(product, field, value)
     await db.commit()
-    await db.refresh(product)
-    return product
+    result = await db.execute(
+        select(Product)
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.supplier),
+        )
+        .where(Product.id == product.id)
+    )
+    return result.scalar_one()
 
 
 @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
