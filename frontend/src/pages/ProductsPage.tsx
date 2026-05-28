@@ -1,175 +1,543 @@
-import { useState } from 'react';
-import { useProducts, useCategories, useSuppliers, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../lib/queries';
-import type { Product } from '../types';
+import { useState } from "react";
+import {
+  keepPreviousData,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { api } from "../lib/api";
 
-const emptyForm = {
-  sku: '', name: '', description: '', barcode: '',
-  category_id: '', supplier_id: '',
-  unit_cost: 0, selling_price: 0,
-  reorder_point: 10, reorder_qty: 50, unit_of_measure: 'units',
-};
+// ---- Types ----
+interface Category {
+  id: string;
+  name: string;
+}
 
-export default function ProductsPage() {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<typeof emptyForm>(emptyForm);
+interface Supplier {
+  id: string;
+  name: string;
+}
 
-  const { data, isLoading } = useProducts({ page, page_size: 15, search: search || undefined });
-  const { data: categories } = useCategories();
-  const { data: suppliers } = useSuppliers();
-  const create = useCreateProduct();
-  const update = useUpdateProduct();
-  const remove = useDeleteProduct();
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  description?: string;
+  unit_cost: number;
+  selling_price: number;
+  category_id: string | null;
+  supplier_id: string | null;
+  category?: { id: string; name: string };
+  supplier?: { id: string; name: string };
+  is_active: boolean;
+}
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setShowModal(true); };
-  const openEdit = (p: Product) => {
-    setEditing(p);
-    setForm({
-      sku: p.sku, name: p.name, description: p.description ?? '',
-      barcode: p.barcode ?? '', category_id: p.category_id,
-      supplier_id: p.supplier_id, unit_cost: p.unit_cost,
-      selling_price: p.selling_price, reorder_point: p.reorder_point,
-      reorder_qty: p.reorder_qty, unit_of_measure: p.unit_of_measure,
-    });
-    setShowModal(true);
-  };
+interface ProductsResponse {
+  items: Product[];
+  total: number;
+  page: number;
+  pages: number;
+}
 
-  const handleSubmit = async () => {
-    if (editing) {
-      await update.mutateAsync({ id: editing.id, ...form });
-    } else {
-      await create.mutateAsync(form);
-    }
-    setShowModal(false);
-  };
+// ---- Hooks ----
+function useCategories() {
+  return useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const res = await api.get("/inventory/categories");
+      return res.data;
+    },
+  });
+}
 
-  const field = (key: keyof typeof emptyForm, label: string, type = 'text') => (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 5 }}>{label}</label>
-      <input
-        type={type}
-        value={form[key] as string | number}
-        onChange={e => setForm(f => ({ ...f, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))}
-        style={{ width: '100%', background: '#0f1117', border: '1px solid #1e2130', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#d1d5db', boxSizing: 'border-box' }}
-      />
-    </div>
-  );
+function useSuppliers() {
+  return useQuery<Supplier[]>({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
+      const res = await api.get("/inventory/suppliers");
+      return res.data;
+    },
+  });
+}
 
-  const selectField = (key: 'category_id' | 'supplier_id', label: string, options: { id: string; name: string }[]) => (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 5 }}>{label}</label>
-      <select
-        value={form[key]}
-        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-        style={{ width: '100%', background: '#0f1117', border: '1px solid #1e2130', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#d1d5db', boxSizing: 'border-box' }}
-      >
-        <option value="">Select {label}...</option>
-        {options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
-    </div>
-  );
+function useProducts(params: {
+  search: string;
+  category_id: string;
+  supplier_id: string;
+  page: number;
+}) {
+  const query = new URLSearchParams();
+  query.set("size", "20");
+  query.set("page", String(params.page));
+  if (params.search) query.set("search", params.search);
+  if (params.category_id) query.set("category_id", params.category_id);
+  if (params.supplier_id) query.set("supplier_id", params.supplier_id);
 
+  return useQuery<ProductsResponse>({
+    queryKey: ["products", params],
+    queryFn: async () => {
+      const res = await api.get(
+        `/inventory/products?${query.toString()}`
+      );
+      return res.data;
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
+// ---- Confirm Delete Modal ----
+function ConfirmModal({
+  product,
+  onConfirm,
+  onCancel,
+  loading,
+}: {
+  product: Product;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
   return (
-    <div style={{ padding: '32px 40px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 600, color: '#f0f0f0', marginBottom: 4 }}>Products</h1>
-          <p style={{ fontSize: 14, color: '#6b7280' }}>{data?.total ?? 0} products in catalogue</p>
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <input
-            placeholder="Search products..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-            style={{ background: '#141720', border: '1px solid #1e2130', borderRadius: 8, padding: '9px 14px', fontSize: 13, color: '#d1d5db', width: 220 }}
-          />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm space-y-4">
+        <h3 className="text-lg font-semibold text-white">Delete Product</h3>
+        <p className="text-gray-400 text-sm">
+          Are you sure you want to delete{" "}
+          <span className="text-white font-medium">{product.name}</span>? This
+          cannot be undone.
+        </p>
+        <div className="flex gap-3 justify-end">
           <button
-            onClick={openNew}
-            style={{ padding: '9px 18px', background: '#6366f1', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg bg-gray-800 text-gray-300 text-sm hover:bg-gray-700"
           >
-            + Add Product
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm hover:bg-rose-700 disabled:opacity-50"
+          >
+            {loading ? "Deleting..." : "Delete"}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div style={{ background: '#141720', border: '1px solid #1e2130', borderRadius: 12, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #1e2130' }}>
-              {['SKU', 'Name', 'Category', 'Supplier', 'Cost', 'Price', 'Reorder At', 'Actions'].map(h => (
-                <th key={h} style={{ padding: '14px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading...</td></tr>
-            )}
-            {(data?.items ?? []).map(p => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #1e2130' }}>
-                <td style={{ padding: '12px 16px', fontSize: 12, color: '#818cf8', fontFamily: 'monospace' }}>{p.sku}</td>
-                <td style={{ padding: '12px 16px', fontSize: 13, color: '#d1d5db', fontWeight: 500 }}>{p.name}</td>
-                <td style={{ padding: '12px 16px', fontSize: 12, color: '#9ca3af' }}>{p.category?.name ?? '—'}</td>
-                <td style={{ padding: '12px 16px', fontSize: 12, color: '#9ca3af' }}>{p.supplier?.name ?? '—'}</td>
-                <td style={{ padding: '12px 16px', fontSize: 13, color: '#d1d5db' }}>${p.unit_cost.toFixed(2)}</td>
-                <td style={{ padding: '12px 16px', fontSize: 13, color: '#34d399' }}>${p.selling_price.toFixed(2)}</td>
-                <td style={{ padding: '12px 16px', fontSize: 13, color: '#f59e0b' }}>{p.reorder_point}</td>
-                <td style={{ padding: '12px 16px' }}>
-                  <button onClick={() => openEdit(p)} style={{ marginRight: 8, padding: '5px 12px', background: 'transparent', border: '1px solid #1e2130', borderRadius: 6, color: '#9ca3af', cursor: 'pointer', fontSize: 12 }}>Edit</button>
-                  <button onClick={() => remove.mutate(p.id)} style={{ padding: '5px 12px', background: 'transparent', border: '1px solid #3f1d1d', borderRadius: 6, color: '#f87171', cursor: 'pointer', fontSize: 12 }}>Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {(data?.pages ?? 0) > 1 && (
-          <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #1e2130' }}>
-            <span style={{ fontSize: 13, color: '#6b7280' }}>Page {page} of {data?.pages}</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '6px 14px', background: 'transparent', border: '1px solid #1e2130', borderRadius: 6, color: '#9ca3af', cursor: 'pointer', fontSize: 13 }}>Prev</button>
-              <button onClick={() => setPage(p => p + 1)} disabled={page === data?.pages} style={{ padding: '6px 14px', background: 'transparent', border: '1px solid #1e2130', borderRadius: 6, color: '#9ca3af', cursor: 'pointer', fontSize: 13 }}>Next</button>
-            </div>
+// ---- Product Form Modal ----
+function ProductModal({
+  product,
+  categories,
+  suppliers,
+  onClose,
+  onSaved,
+}: {
+  product: Product | null;
+  categories: Category[];
+  suppliers: Supplier[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = product !== null;
+  const [form, setForm] = useState({
+    name: product?.name ?? "",
+    sku: product?.sku ?? "",
+    description: product?.description ?? "",
+    selling_price: product?.selling_price ?? 0,
+    category_id: product?.category_id ?? "",
+    supplier_id: product?.supplier_id ?? "",
+  });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function set(key: string, val: string | number) {
+    setForm((f) => ({ ...f, [key]: val }));
+  }
+
+  async function handleSubmit() {
+    setError("");
+    if (!form.name.trim() || !form.sku.trim()) {
+      setError("Name and SKU are required.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        category_id: form.category_id || undefined,
+        supplier_id: form.supplier_id || undefined,
+      };
+      if (isEdit) {
+        await api.patch(
+          `/inventory/products/${product!.id}`,
+          payload
+        );
+      } else {
+        await api.post("/inventory/products", {
+          ...payload,
+          unit_cost: 0,
+        });
+      }
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.detail ?? "Failed to save product."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-lg space-y-4">
+        <h3 className="text-lg font-semibold text-white">
+          {isEdit ? "Edit Product" : "Add Product"}
+        </h3>
+
+        {error && (
+          <p className="text-rose-400 text-sm bg-rose-950/40 border border-rose-800 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="text-xs text-gray-400 mb-1 block">Name</label>
+            <input
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              value={form.name}
+              onChange={(e) => set("name", e.target.value)}
+            />
           </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">SKU</label>
+            <input
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              value={form.sku}
+              onChange={(e) => set("sku", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">
+              Unit Price
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              value={form.selling_price}
+              onChange={(e) => set("selling_price", parseFloat(e.target.value))}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">
+              Category
+            </label>
+            <select
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              value={form.category_id}
+              onChange={(e) => set("category_id", e.target.value)}
+            >
+              <option value="">-- Select --</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">
+              Supplier
+            </label>
+            <select
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              value={form.supplier_id}
+              onChange={(e) => set("supplier_id", e.target.value)}
+            >
+              <option value="">-- Select --</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs text-gray-400 mb-1 block">
+              Description
+            </label>
+            <textarea
+              rows={2}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 justify-end pt-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-gray-800 text-gray-300 text-sm hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : isEdit ? "Save Changes" : "Create Product"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Main Page ----
+export default function ProductsPage() {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [page, setPage] = useState(1);
+  const [editProduct, setEditProduct] = useState<Product | null | undefined>(
+    undefined
+  ); // undefined = closed, null = new, Product = edit
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const categoriesQ = useCategories();
+  const suppliersQ = useSuppliers();
+  const productsQ = useProducts({
+    search,
+    category_id: categoryId,
+    supplier_id: supplierId,
+    page,
+  });
+
+  const categories = categoriesQ.data ?? [];
+  const suppliers = suppliersQ.data ?? [];
+  const products = productsQ.data?.items ?? [];
+  const totalPages = productsQ.data?.pages ?? 1;
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      await api.delete(`/inventory/products/${deleteTarget.id}`);
+      qc.invalidateQueries({ queryKey: ["products"] });
+      setDeleteTarget(null);
+    } catch (e) {
+      // silently fail — user can retry
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  function handleSearchChange(val: string) {
+    setSearch(val);
+    setPage(1);
+  }
+
+  function handleCategoryChange(val: string) {
+    setCategoryId(val);
+    setPage(1);
+  }
+
+  function handleSupplierChange(val: string) {
+    setSupplierId(val);
+    setPage(1);
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white p-6 space-y-6">
+      {/* Modals */}
+      {editProduct !== undefined && (
+        <ProductModal
+          product={editProduct}
+          categories={categories}
+          suppliers={suppliers}
+          onClose={() => setEditProduct(undefined)}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["products"] })}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmModal
+          product={deleteTarget}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          loading={deleteLoading}
+        />
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Products</h1>
+          <p className="text-gray-400 text-sm mt-1">
+            {productsQ.data?.total ?? 0} total products
+          </p>
+        </div>
+        <button
+          onClick={() => setEditProduct(null)}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg"
+        >
+          + Add Product
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <input
+          type="text"
+          placeholder="Search by name or SKU..."
+          value={search}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 w-64"
+        />
+        <select
+          value={categoryId}
+          onChange={(e) => handleCategoryChange(e.target.value)}
+          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+        >
+          <option value="">All Categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={supplierId}
+          onChange={(e) => handleSupplierChange(e.target.value)}
+          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+        >
+          <option value="">All Suppliers</option>
+          {suppliers.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        {(search || categoryId || supplierId) && (
+          <button
+            onClick={() => {
+              setSearch("");
+              setCategoryId("");
+              setSupplierId("");
+              setPage(1);
+            }}
+            className="px-3 py-2 text-xs text-gray-400 hover:text-white bg-gray-800 border border-gray-700 rounded-lg"
+          >
+            Clear filters
+          </button>
         )}
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: '#141720', border: '1px solid #1e2130', borderRadius: 16, padding: 32, width: 540, maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 600, color: '#f0f0f0' }}>{editing ? 'Edit Product' : 'New Product'}</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 20 }}>×</button>
-            </div>
+      {/* Table */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        {productsQ.isLoading ? (
+          <div className="p-8 text-center text-gray-500 text-sm">
+            Loading products...
+          </div>
+        ) : products.length === 0 ? (
+          <div className="p-8 text-center text-gray-500 text-sm">
+            No products found.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-800/60 text-gray-400 text-xs uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">SKU</th>
+                <th className="px-4 py-3 text-left">Category</th>
+                <th className="px-4 py-3 text-left">Supplier</th>
+                <th className="px-4 py-3 text-right">Price</th>
+                <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {products.map((p) => (
+                <tr key={p.id} className="hover:bg-gray-800/30">
+                  <td className="px-4 py-3 font-medium text-white">
+                    {p.name}
+                  </td>
+                  <td className="px-4 py-3 text-gray-400 font-mono text-xs">
+                    {p.sku}
+                  </td>
+                  <td className="px-4 py-3 text-gray-300">
+                    {p.category?.name ?? "-"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-300">
+                    {p.supplier?.name ?? "-"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-200">
+                    ${p.selling_price.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span
+                      className={
+                        p.is_active
+                          ? "text-xs bg-emerald-900/40 text-emerald-400 border border-emerald-800 rounded-full px-2 py-0.5"
+                          : "text-xs bg-gray-800 text-gray-500 border border-gray-700 rounded-full px-2 py-0.5"
+                      }
+                    >
+                      {p.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => setEditProduct(p)}
+                        className="text-xs text-indigo-400 hover:text-indigo-300 px-2 py-1 rounded hover:bg-indigo-950/40"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(p)}
+                        className="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-950/40"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-              {field('sku', 'SKU')}
-              {field('name', 'Product Name')}
-              {field('unit_cost', 'Unit Cost', 'number')}
-              {field('selling_price', 'Selling Price', 'number')}
-              {field('reorder_point', 'Reorder Point', 'number')}
-              {field('reorder_qty', 'Reorder Qty', 'number')}
-              {field('unit_of_measure', 'Unit of Measure')}
-              {field('barcode', 'Barcode')}
-            </div>
-            <div style={{ gridColumn: '1/-1' }}>
-              {selectField('category_id', 'Category', categories ?? [])}
-              {selectField('supplier_id', 'Supplier', suppliers ?? [])}
-              {field('description', 'Description')}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-              <button onClick={() => setShowModal(false)} style={{ padding: '9px 20px', background: 'transparent', border: '1px solid #1e2130', borderRadius: 8, color: '#9ca3af', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
-              <button
-                onClick={handleSubmit}
-                disabled={create.isPending || update.isPending}
-                style={{ padding: '9px 24px', background: '#6366f1', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
-              >
-                {create.isPending || update.isPending ? 'Saving...' : editing ? 'Save Changes' : 'Create Product'}
-              </button>
-            </div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-500">
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1.5 text-xs bg-gray-800 text-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-700"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 text-xs bg-gray-800 text-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-700"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}

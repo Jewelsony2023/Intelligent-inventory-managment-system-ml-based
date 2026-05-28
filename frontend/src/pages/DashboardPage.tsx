@@ -1,243 +1,401 @@
-import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  useProducts,
-  useCategories,
-  useMovements,
-  useReorderRecommendations,
-} from "../lib/queries";
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
+import { api } from "../lib/api";
 
-interface KPICardProps {
+// ---- Types ----
+interface DashboardStats {
+  total_products: number;
+  low_stock_count: number;
+  total_categories: number;
+  total_value: number;
+}
+
+interface Movement {
+  id: string;
+  movement_type: string; // "IN" | "OUT"
+  quantity: number;
+  created_at: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  product_count?: number;
+}
+
+interface Product {
+  id: string;
+  category_id: string | null;
+}
+
+interface ProductsResponse {
+  items: Product[];
+  total: number;
+}
+
+interface InventoryItem {
+  id: string;
+  product_id: string;
+  quantity: number;
+  product?: { name: string; reorder_point: number };
+}
+
+interface InventoryResponse {
+  items: InventoryItem[];
+}
+
+// ---- Hooks ----
+function useDashboardStats() {
+  return useQuery<DashboardStats>({
+    queryKey: ["dashboard-stats"],
+    queryFn: async () => {
+      const [productsRes, inventoryRes, categoriesRes] = await Promise.all([
+        api.get<ProductsResponse>("/inventory/products?size=100"),
+        api.get<InventoryResponse>("/inventory/inventory?size=100"),
+        api.get<Category[]>("/inventory/categories"),
+      ]);
+      const lowStockCount = inventoryRes.data.items.filter((item) => {
+        const reorderPoint = item.product?.reorder_point ?? 0;
+        return reorderPoint > 0 && item.quantity <= reorderPoint;
+      }).length;
+      return {
+        total_products: productsRes.data.total,
+        low_stock_count: lowStockCount,
+        total_categories: categoriesRes.data.length,
+        total_value: 0,
+      };
+    },
+  });
+}
+
+function useMovements(limit = 200) {
+  return useQuery<Movement[]>({
+    queryKey: ["movements", limit],
+    queryFn: async () => {
+      const res = await api.get(`/inventory/movements?limit=${limit}`);
+      return res.data;
+    },
+  });
+}
+
+function useCategories() {
+  return useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const res = await api.get("/inventory/categories");
+      return res.data;
+    },
+  });
+}
+
+function useProducts() {
+  return useQuery<ProductsResponse>({
+    queryKey: ["products-all"],
+    queryFn: async () => {
+      const res = await api.get("/inventory/products?size=100");
+      return res.data;
+    },
+  });
+}
+
+function useLowStock() {
+  return useQuery<InventoryItem[]>({
+    queryKey: ["low-stock"],
+    queryFn: async () => {
+      const res = await api.get<InventoryResponse>("/inventory/inventory?size=100");
+      return res.data.items
+        .filter((item) => {
+          const reorderPoint = item.product?.reorder_point ?? 0;
+          return reorderPoint > 0 && item.quantity <= reorderPoint;
+        })
+        .slice(0, 10);
+    },
+  });
+}
+
+// ---- Chart helpers ----
+const CHART_COLORS = [
+  "#6366f1",
+  "#22d3ee",
+  "#f59e0b",
+  "#10b981",
+  "#f43f5e",
+  "#a78bfa",
+];
+
+function build7DayData(movements: Movement[]) {
+  const days: { date: string; IN: number; OUT: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const label = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+    const dateStr = d.toISOString().slice(0, 10);
+    days.push({ date: label, IN: 0, OUT: 0, _key: dateStr } as any);
+  }
+
+  for (const m of movements) {
+    const mDate = m.created_at.slice(0, 10);
+    const slot = (days as any[]).find((d: any) => d._key === mDate);
+    if (slot) {
+      if (m.movement_type === "IN") slot.IN += m.quantity;
+      else if (m.movement_type === "OUT") slot.OUT += m.quantity;
+    }
+  }
+
+  return days.map(({ _key, ...rest }: any) => rest);
+}
+
+function buildCategoryData(
+  categories: Category[],
+  products: Product[]
+) {
+  return categories.map((cat) => ({
+    name: cat.name,
+    value: products.filter((p) => p.category_id === cat.id).length,
+  }));
+}
+
+// ---- Stat Card ----
+function StatCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
   label: string;
   value: string | number;
-  icon: React.ReactNode;
-  iconBg: string;
   sub?: string;
-  loading?: boolean;
-}
-
-function KPICard({ label, value, icon, iconBg, sub, loading }: KPICardProps) {
+  accent: string;
+}) {
   return (
-    <div className="bg-slate-800 border border-white/10 rounded-xl p-5">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="text-slate-400 text-sm">{label}</p>
-          {loading ? (
-            <div className="mt-2 h-8 w-20 bg-slate-700 rounded animate-pulse" />
-          ) : (
-            <p className="mt-1 text-3xl font-bold text-white">{value}</p>
-          )}
-          {sub && !loading && (
-            <p className="mt-1 text-xs text-slate-500">{sub}</p>
-          )}
-        </div>
-        <div className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${iconBg}`}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LowStockRow({ label, urgency }: { label: string; urgency: string }) {
-  const colors: Record<string, string> = {
-    critical: "text-red-400 bg-red-500/10 border-red-500/20",
-    high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-    medium: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    low: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-  };
-  return (
-    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
-      <span className="text-slate-300 text-sm">{label}</span>
-      <span className={`text-xs font-medium px-2 py-0.5 rounded border ${
-        colors[urgency] ?? "text-slate-400 bg-slate-700 border-slate-600"
-      }`}>
-        {urgency.charAt(0).toUpperCase() + urgency.slice(1)}
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col gap-2">
+      <span className={`text-xs font-semibold uppercase tracking-widest ${accent}`}>
+        {label}
       </span>
+      <span className="text-3xl font-bold text-white">{value}</span>
+      {sub && <span className="text-xs text-gray-500">{sub}</span>}
     </div>
   );
 }
 
-const MOVE_COLORS: Record<string, string> = {
-  IN: "text-emerald-400 bg-emerald-500/10",
-  OUT: "text-red-400 bg-red-500/10",
-  TRANSFER: "text-blue-400 bg-blue-500/10",
-  ADJUSTMENT: "text-amber-400 bg-amber-500/10",
-};
-
+// ---- Main Component ----
 export default function DashboardPage() {
-  const { data: productsData, isLoading: loadingProducts } = useProducts({ page: 1, size: 1 });
-  const { data: categories, isLoading: loadingCategories } = useCategories();
-  const { data: movements, isLoading: loadingMovements } = useMovements({ limit: 200 });
-  const { data: reorderRecs, isLoading: loadingReorder } = useReorderRecommendations();
+  const stats = useDashboardStats();
+  const movementsQ = useMovements(200);
+  const categoriesQ = useCategories();
+  const productsQ = useProducts();
+  const lowStockQ = useLowStock();
 
-  const lowStockItems = useMemo(
-    () => reorderRecs?.filter((r) => r.urgency_label !== "ok") ?? [],
-    [reorderRecs]
-  );
+  const movements: Movement[] = movementsQ.data ?? [];
+  const categories: Category[] = categoriesQ.data ?? [];
+  const products: Product[] = productsQ.data?.items ?? [];
+  const lowStockItems: InventoryItem[] = lowStockQ.data ?? [];
 
-  const todayMovements = useMemo(() => {
-    if (!movements) return [];
-    const today = new Date().toDateString();
-    return movements.filter(
-      (m) => new Date(m.created_at).toDateString() === today
-    );
-  }, [movements]);
+  const barData = build7DayData(movements);
+  const pieData = buildCategoryData(categories, products);
 
-  const recentMovements = movements?.slice(0, 8) ?? [];
+  const isLoading =
+    stats.isLoading ||
+    movementsQ.isLoading ||
+    categoriesQ.isLoading ||
+    productsQ.isLoading;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-gray-950 text-white p-6 space-y-8">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="text-slate-400 text-sm mt-0.5">Live overview of your inventory system</p>
+        <p className="text-gray-400 text-sm mt-1">
+          Inventory IQ - Operations Overview
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <KPICard
-          label="Total Products"
-          value={productsData?.total ?? 0}
-          loading={loadingProducts}
-          sub="across all categories"
-          iconBg="bg-indigo-500/20"
-          icon={
-            <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-          }
-        />
+      {/* Stat Cards */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-gray-900 border border-gray-800 rounded-xl p-5 h-24 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <StatCard
+            label="Total Products"
+            value={stats.data?.total_products ?? products.length}
+            sub="Active SKUs"
+            accent="text-indigo-400"
+          />
+          <StatCard
+            label="Low Stock"
+            value={stats.data?.low_stock_count ?? lowStockItems.length}
+            sub="Below reorder point"
+            accent="text-rose-400"
+          />
+          <StatCard
+            label="Categories"
+            value={stats.data?.total_categories ?? categories.length}
+            sub="Product groups"
+            accent="text-cyan-400"
+          />
+          <StatCard
+            label="Movements (7d)"
+            value={movements.filter((m) => {
+              const d = new Date(m.created_at);
+              const cutoff = new Date();
+              cutoff.setDate(cutoff.getDate() - 7);
+              return d >= cutoff;
+            }).length}
+            sub="Stock events"
+            accent="text-amber-400"
+          />
+        </div>
+      )}
 
-        <KPICard
-          label="Low Stock Alerts"
-          value={lowStockItems.length}
-          loading={loadingReorder}
-          sub={
-            lowStockItems.filter((r) => r.urgency_label === "critical").length > 0
-              ? `${lowStockItems.filter((r) => r.urgency_label === "critical").length} critical`
-              : "no critical items"
-          }
-          iconBg="bg-red-500/20"
-          icon={
-            <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-          }
-        />
-
-        <KPICard
-          label="Movements Today"
-          value={todayMovements.length}
-          loading={loadingMovements}
-          sub="stock transactions"
-          iconBg="bg-emerald-500/20"
-          icon={
-            <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-              />
-            </svg>
-          }
-        />
-
-        <KPICard
-          label="Categories"
-          value={categories?.length ?? 0}
-          loading={loadingCategories}
-          sub="product classifications"
-          iconBg="bg-amber-500/20"
-          icon={
-            <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
-              />
-            </svg>
-          }
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-800 border border-white/10 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-white font-semibold">Low Stock Alerts</h2>
-            <span className="text-xs text-slate-500">
-              {lowStockItems.length} item{lowStockItems.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          {loadingReorder ? (
-            <div className="space-y-2.5">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-8 bg-slate-700 rounded animate-pulse" />
-              ))}
-            </div>
-          ) : lowStockItems.length === 0 ? (
-            <div className="py-8 text-center text-slate-500 text-sm">
-              All stock levels are healthy
-            </div>
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        {/* Bar Chart - 7 day movements */}
+        <div className="lg:col-span-3 bg-gray-900 border border-gray-800 rounded-xl p-6">
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-widest mb-4">
+            Stock Movements - Last 7 Days
+          </h2>
+          {movementsQ.isLoading ? (
+            <div className="h-52 animate-pulse bg-gray-800 rounded-lg" />
           ) : (
-            <div>
-              {lowStockItems.slice(0, 8).map((item) => (
-                <LowStockRow
-                  key={item.product_id}
-                  label={item.product_name}
-                  urgency={item.urgency_label}
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={barData}
+                margin={{ top: 4, right: 8, left: -16, bottom: 0 }}
+              >
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: "#6b7280", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
-              ))}
-              {lowStockItems.length > 8 && (
-                <p className="text-xs text-slate-500 mt-2 text-center">
-                  +{lowStockItems.length - 8} more in ML Insights
-                </p>
-              )}
-            </div>
+                <YAxis
+                  tick={{ fill: "#6b7280", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "#111827",
+                    border: "1px solid #374151",
+                    borderRadius: "8px",
+                    color: "#f9fafb",
+                  }}
+                  cursor={{ fill: "rgba(99,102,241,0.08)" }}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, color: "#9ca3af" }}
+                />
+                <Bar
+                  dataKey="IN"
+                  fill="#6366f1"
+                  radius={[3, 3, 0, 0]}
+                  name="Stock In"
+                />
+                <Bar
+                  dataKey="OUT"
+                  fill="#f43f5e"
+                  radius={[3, 3, 0, 0]}
+                  name="Stock Out"
+                />
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
 
-        <div className="bg-slate-800 border border-white/10 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-white font-semibold">Recent Movements</h2>
-            <span className="text-xs text-slate-500">Last 8 transactions</span>
-          </div>
-          {loadingMovements ? (
-            <div className="space-y-2.5">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-8 bg-slate-700 rounded animate-pulse" />
-              ))}
-            </div>
-          ) : recentMovements.length === 0 ? (
-            <div className="py-8 text-center text-slate-500 text-sm">
-              No movements recorded yet
-            </div>
+        {/* Pie Chart - categories */}
+        <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-6">
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-widest mb-4">
+            Products by Category
+          </h2>
+          {categoriesQ.isLoading || productsQ.isLoading ? (
+            <div className="h-52 animate-pulse bg-gray-800 rounded-lg" />
           ) : (
-            <div>
-              {recentMovements.map((m) => (
-                <div key={m.id} className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${
-                      MOVE_COLORS[m.movement_type] ?? "text-slate-400 bg-slate-700"
-                    }`}>
-                      {m.movement_type}
-                    </span>
-                    <span className="text-slate-300 text-sm truncate">
-                      {m.product?.name ?? m.product_id.slice(0, 8)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-white text-sm font-medium">x{m.quantity}</span>
-                    <span className="text-slate-500 text-xs">
-                      {new Date(m.created_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="45%"
+                  innerRadius={52}
+                  outerRadius={80}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {pieData.map((_, idx) => (
+                    <Cell
+                      key={idx}
+                      fill={CHART_COLORS[idx % CHART_COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    background: "#111827",
+                    border: "1px solid #374151",
+                    borderRadius: "8px",
+                    color: "#f9fafb",
+                  }}
+                />
+                <Legend
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: 11, color: "#9ca3af" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
+
+      {/* Low Stock Alerts */}
+      {lowStockItems.length > 0 && (
+        <div className="bg-gray-900 border border-rose-900/50 rounded-xl p-6">
+          <h2 className="text-sm font-semibold text-rose-400 uppercase tracking-widest mb-4">
+            Low Stock Alerts
+          </h2>
+          <div className="space-y-2">
+            {lowStockItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between bg-gray-950 rounded-lg px-4 py-3"
+              >
+                <span className="text-sm text-gray-200">
+                  {item.product?.name ?? item.product_id}
+                </span>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-gray-500">
+                    Reorder: {item.product?.reorder_point ?? 0}
+                  </span>
+                  <span className="text-sm font-bold text-rose-400">
+                    {item.quantity} left
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
