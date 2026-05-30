@@ -383,9 +383,12 @@ export default function DashboardPage() {
       {/* Low Stock Alerts */}
       {lowStockItems.length > 0 && (
         <div className="bg-gray-900 border border-rose-900/50 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-rose-400 uppercase tracking-widest mb-4">
-            Low Stock Alerts
-          </h2>
+            <h2 className="text-sm font-semibold text-rose-400 uppercase tracking-widest mb-4">
+              Low Stock Alerts
+              <span className="ml-2 text-xs bg-rose-900/40 border border-rose-800 text-rose-300 rounded-full px-2 py-0.5 normal-case">
+                {lowStockItems.length} items
+              </span>
+            </h2>
           <div className="space-y-2">
             {lowStockItems.map((item) => (
               <div
