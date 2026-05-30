@@ -217,11 +217,23 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white p-6 space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="text-gray-400 text-sm mt-1">
-          Inventory IQ - Operations Overview
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          <p className="text-gray-400 text-sm mt-1">
+            Inventory IQ - Operations Overview
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-gray-500">Last updated</p>
+          <p className="text-sm text-gray-300 font-mono">
+            {new Date().toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </p>
+        </div>
       </div>
 
       {/* Stat Cards */}
